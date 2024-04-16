@@ -240,4 +240,10 @@ function M.get_code_action_marks()
     return marks
 end
 
+---@param mark CodeActionMark
+---@return CodeActionIdentifier
+function M.get_code_action_identifier_by_mark(mark)
+    return code_action_marks[mark]
+end
+
 return M

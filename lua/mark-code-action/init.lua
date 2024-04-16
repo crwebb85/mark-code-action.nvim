@@ -21,10 +21,22 @@ M.setup = function(opts)
 
     vim.api.nvim_create_user_command('MarkCodeActionRun', action.command_run_mark, {
         desc = 'Runs a Code Action Mark',
-        nargs = 1, --0 or 1 param
+        nargs = 1,
         complete = action.get_code_action_marks,
         range = true,
     })
+
+    vim.api.nvim_create_user_command('MarkCodeActionInspect', function(args)
+        local mark = args.args
+        vim.print(action.get_code_action_identifier_by_mark(mark))
+    end, {
+        desc = 'Inspects a Code Action Mark',
+        nargs = 1,
+        complete = action.get_code_action_marks,
+    })
 end
+
+M.get_code_action_identifier_by_mark = action.get_code_action_identifier_by_mark
+M.get_code_action_marks = action.get_code_action_marks
 
 return M
