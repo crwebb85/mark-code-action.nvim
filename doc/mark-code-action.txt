@@ -1,0 +1,15 @@
+*mark-code-action.txt*
+
+Minimum version of neovim: 0.10.0
+
+--------------------------------------------------------------------------------
+CONTENTS                                            *mark-code-action-contents*
+
+  1. Options                                         |mark-code-action-options|
+
+--------------------------------------------------------------------------------
+OPTIONS                                              *mark-code-action-options*
+
+I have not implemented any options yet.
+
+
