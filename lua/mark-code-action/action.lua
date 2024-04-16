@@ -1,9 +1,11 @@
 local M = {}
 
----@class CodeAction
----@field client_id number id of the lsp client
+---@class CodeActionIdentifier
+---@field client_id? number id of the lsp client (at the time of making the mark)
+---@field client_name string name of the lsp client
 ---@field kind string lsp action kind
 ---@field title string lsp action title
+---@field full_action? lsp.Command|lsp.CodeAction of the lsp code action (at the time of making the mark)
 
 ---@class CommandOpts
 ---@field name string
@@ -26,7 +28,7 @@ local M = {}
 ---@field start LinePosition
 ---@field end LinePosition
 
----@type {[CodeActionMark]: CodeAction}
+---@type {[CodeActionMark]: CodeActionIdentifier}
 local code_action_marks = {} -- Stores the code action marks
 
 ---@private
@@ -77,7 +79,7 @@ function M.command_mark(opts)
     local params = build_code_action_params(bufnr, is_range)
 
     vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
-        ---@type CodeAction[]
+        ---@type CodeActionIdentifier[]
         local actions = {}
 
         ---@type string[]
@@ -85,17 +87,24 @@ function M.command_mark(opts)
 
         local index = 1
         for client_id, result in pairs(results) do
-            for _, lsp_action in pairs(result.result or {}) do
-                local action = {
-                    client_id = client_id,
-                    kind = lsp_action.kind,
-                    title = lsp_action.title,
-                }
-                table.insert(actions, action)
-                local action_selection_text = index .. '. ' .. lsp_action.title
-                table.insert(action_selection_list, action_selection_text)
+            local client = vim.lsp.get_client_by_id(client_id)
+            if client ~= nil then
+                for _, lsp_action in pairs(result.result or {}) do
+                    ---@type CodeActionIdentifier
+                    local action_identifier = {
+                        client_id = client_id,
+                        client_name = client.name,
+                        kind = lsp_action.kind,
+                        title = lsp_action.title,
+                        full_action = lsp_action,
+                    }
+                    table.insert(actions, action_identifier)
 
-                index = index + 1
+                    local action_selection_text = index .. '. ' .. lsp_action.title
+                    table.insert(action_selection_list, action_selection_text)
+
+                    index = index + 1
+                end
             end
         end
 
@@ -104,7 +113,7 @@ function M.command_mark(opts)
             return
         end
 
-        --promt user to select the code action to mark
+        --prompt user to select the code action to mark
         local selection = vim.fn.inputlist(action_selection_list)
         local selection_index = tonumber(selection)
         local selected_action = actions[selection_index]
@@ -137,6 +146,7 @@ local function apply_action(action, client, ctx)
     local a_cmd = action.command
     if a_cmd then
         local command = type(a_cmd) == 'table' and a_cmd or action
+        ---@diagnostic disable-next-line: param-type-mismatch
         client:_exec_cmd(command, ctx)
     end
 end
@@ -190,8 +200,8 @@ function M.command_run_mark(opts)
     local is_range = (opts.range == 2)
     local params = build_code_action_params(bufnr, is_range)
 
-    local action_mark = code_action_marks[mark_name]
-    if action_mark == nil then
+    local action_identifier = code_action_marks[mark_name]
+    if action_identifier == nil then
         vim.notify('Invalid action mark.', vim.log.levels.INFO)
         return
     end
@@ -208,10 +218,14 @@ function M.command_run_mark(opts)
 
     vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
         for client_id, result in pairs(results) do
-            for _, lsp_action in pairs(result.result or {}) do
-                if lsp_action.kind == action_mark.kind and lsp_action.title == action_mark.title then
-                    apply_code_action(bufnr, client_id, params, lsp_action)
-                    return
+            local client = vim.lsp.get_client_by_id(client_id)
+            if client ~= nil and client.name == action_identifier.client_name then
+                for _, lsp_action in pairs(result.result or {}) do
+                    --TODO convert the condition below into a function that can be overridden in the plugin configuration
+                    if lsp_action.kind == action_identifier.kind and lsp_action.title == action_identifier.title then
+                        apply_code_action(bufnr, client_id, params, lsp_action)
+                        return
+                    end
                 end
             end
         end
