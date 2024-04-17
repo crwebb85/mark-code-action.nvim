@@ -31,6 +31,12 @@ local M = {}
 ---@type {[CodeActionMark]: CodeActionIdentifier}
 local code_action_marks = {} -- Stores the code action marks
 
+---Merges the code action marks defined in the configuration to the list of code action marks
+---@param opts MarkCodeActionConfig
+function M.merge_code_action_marks(opts)
+    code_action_marks = vim.tbl_deep_extend('force', code_action_marks, opts.marks or {})
+end
+
 ---@private
 ---@param bufnr integer
 ---@return TextRange {start={row, col}, end={row, col}} using (1, 0) indexing

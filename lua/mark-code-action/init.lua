@@ -1,17 +1,18 @@
 local action = require('mark-code-action.action')
 
----@class MarkCodeActionConfig
-local config = {}
-
 ---@class MarkCodeActionAPI
 local M = {}
 
----@type MarkCodeActionConfig
-M.config = config
+---@class MarkCodeActionConfig
+---@field marks? {[CodeActionMark]: CodeActionIdentifier}
+local config = {
+    marks = {},
+}
 
 ---@param opts MarkCodeActionConfig?
 M.setup = function(opts)
-    M.config = vim.tbl_deep_extend('force', M.config, opts or {})
+    config = vim.tbl_deep_extend('force', config, opts or {})
+    action.merge_code_action_marks(config)
 
     vim.api.nvim_create_user_command('MarkCodeActionMark', action.command_mark, {
         desc = 'Marks a Code Action item',
@@ -38,5 +39,10 @@ end
 
 M.get_code_action_identifier_by_mark = action.get_code_action_identifier_by_mark
 M.get_code_action_marks = action.get_code_action_marks
+
+--Get current configuration
+M.get_config = function()
+    return config
+end
 
 return M
