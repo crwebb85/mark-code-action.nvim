@@ -16,7 +16,7 @@ M.setup = function(opts)
 
     vim.api.nvim_create_user_command('MarkCodeActionMark', action.command_mark, {
         desc = 'Marks a Code Action item',
-        nargs = '?', --0 or 1 param
+        nargs = 1,
         range = true,
     })
 

@@ -75,9 +75,18 @@ local function build_code_action_params(bufnr, is_range)
     return params
 end
 
+--- Prompts the user for a code action to mark and marks it with the user
+--- provided mark name. The mark name must be a single letter within the set
+--- {0-9a-zA-Z}. This function will override an already exists mark if it exists.
 --- @param opts CommandOpts
 function M.command_mark(opts)
-    local mark_name = opts.args
+    local mark_name = opts.fargs[1]
+    mark_name = mark_name:gsub('%s+', '') -- strip whitespace
+
+    if string.match(mark_name, '%w') == nil or string.len(mark_name) ~= 1 then
+        vim.notify('Mark name must be a single character within the set {0-9a-zA-Z}.', vim.log.levels.ERROR)
+        return
+    end
 
     local bufnr = vim.api.nvim_get_current_buf()
 
@@ -115,7 +124,7 @@ function M.command_mark(opts)
         end
 
         if #actions == 0 then
-            vim.notify('No code actions available\n', vim.log.levels.ERROR)
+            vim.notify('No code actions available.', vim.log.levels.WARN)
             return
         end
 
@@ -124,20 +133,11 @@ function M.command_mark(opts)
         local selection_index = tonumber(selection)
         local selected_action = actions[selection_index]
         if selected_action == nil then
-            vim.notify('Not a valid selection\n', vim.log.levels.ERROR)
+            vim.notify('Not a valid selection.', vim.log.levels.ERROR)
             return
         end
 
-        --prompt for a mark name if one wasn't already provided
-        if mark_name == nil or mark_name:gsub('%s+', '') == '' then
-            mark_name = vim.fn.input({ prompt = '\nMark name:\n', default = '0' })
-        end
-
-        if mark_name ~= nil then
-            code_action_marks[mark_name] = selected_action
-        else
-            vim.notify('No mark name entered\n', vim.log.levels.ERROR)
-        end
+        code_action_marks[mark_name] = selected_action
     end)
 end
 
@@ -208,7 +208,7 @@ function M.command_run_mark(opts)
 
     local action_identifier = code_action_marks[mark_name]
     if action_identifier == nil then
-        vim.notify('Invalid action mark.', vim.log.levels.INFO)
+        vim.notify('Mark name does not exist.', vim.log.levels.ERROR)
         return
     end
 
