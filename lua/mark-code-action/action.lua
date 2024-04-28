@@ -141,6 +141,63 @@ function M.command_mark(opts)
     end)
 end
 
+---Finds the buffer number for the buffer with given buffer name
+---@param name string buffer name
+---@return integer bufnr
+local find_bufnr_by_name = function(name)
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        local buf_name = vim.api.nvim_buf_get_name(buf)
+        -- checks that the buf_name has name as a suffix
+        -- since nvim_buf_get_name will prefix the name with
+        -- the project file path
+        if buf_name:sub(-#name) == name then
+            return buf
+        end
+    end
+    return -1
+end
+
+---Opens the code action editor for the given mark name
+---@param mark CodeActionMark
+function M.open_code_action_editor(mark)
+    local buf_name = 'MarkCodeActionEdit: ' .. mark
+
+    local bufnr = find_bufnr_by_name(buf_name)
+    if bufnr == -1 then
+        bufnr = vim.api.nvim_create_buf(true, true)
+        vim.api.nvim_buf_set_name(bufnr, buf_name)
+    end
+
+    vim.bo[bufnr].filetype = 'json'
+    vim.bo[bufnr].buftype = 'acwrite' --saving uses my custom autocmd
+
+    local mark_info = {}
+    mark_info[mark] = M.get_code_action_identifier_by_mark(mark)
+    local action_string = vim.json.encode(mark_info)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, vim.split(action_string, '\n'))
+
+    vim.bo[bufnr].modified = false
+    vim.api.nvim_set_current_buf(bufnr)
+
+    vim.api.nvim_create_autocmd('BufWriteCmd', {
+        group = vim.api.nvim_create_augroup('MarkCodeActionEditWrite', { clear = true }),
+        nested = true,
+        buffer = bufnr,
+
+        callback = function(params)
+            vim.print(params)
+            local lines = vim.api.nvim_buf_get_lines(params.buf, 0, -1, false)
+
+            local mark_edits = vim.json.decode(vim.fn.join(lines, '\n'))
+
+            --TODO validate the edited mark
+
+            code_action_marks[mark] = mark_edits[mark]
+            vim.bo[params.buf].modified = false
+        end,
+    })
+end
+
 --- based on https://github.com/neovim/neovim/blob/8e5c48b08dad54706500e353c58ffb91f2684dd3/runtime/lua/vim/lsp/buf.lua#L677
 ---@param action lsp.Command|lsp.CodeAction
 ---@param client vim.lsp.Client

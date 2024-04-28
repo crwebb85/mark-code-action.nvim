@@ -7,7 +7,8 @@
 -   [x] restrict mark command to only allow marks names to have a single
         alphanumeric character to distinguish it from configuration marks and
         prevent overriding what is in the configuration
--   [ ] add edit mark command
+-   [x] add edit mark command
+-   [ ] add match strategies (title equals, contains, begins with, ends with, vimregex, lua regex, etc)
 -   [ ] add the ability to bind several actions to the same configuration mark.
         For example "RemoveUnusedImports" is a common action in many LSPs and
         it would be nice to be able to run "MarkCodeActionRun RemoveUnusedImports"
@@ -42,6 +43,7 @@
     same mark. For example "Sorting Imports" and "Remove Unused Imports" ought to
     be configured to seperate marks. The user can always create a custom macro,
     keybinding, or command to chain them together.
+-   Avoid plugin dependencies
 
 # Brainstorming Datastructure For Marks and their configuration:
 

@@ -35,6 +35,15 @@ M.setup = function(opts)
         nargs = 1,
         complete = action.get_code_action_marks,
     })
+
+    vim.api.nvim_create_user_command('MarkCodeActionEdit', function(args)
+        local mark = args.args
+        action.open_code_action_editor(mark)
+    end, {
+        desc = 'Edits a Code Action Mark',
+        nargs = 1,
+        complete = action.get_code_action_marks,
+    })
 end
 
 M.get_code_action_identifier_by_mark = action.get_code_action_identifier_by_mark
