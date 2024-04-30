@@ -185,7 +185,6 @@ function M.open_code_action_editor(mark)
         buffer = bufnr,
 
         callback = function(params)
-            vim.print(params)
             local lines = vim.api.nvim_buf_get_lines(params.buf, 0, -1, false)
 
             local mark_edits = vim.json.decode(vim.fn.join(lines, '\n'))
@@ -254,6 +253,66 @@ local function apply_code_action(bufnr, client_id, params, action)
     end
 end
 
+--- based on https://github.com/neovim/neovim/blob/8e5c48b08dad54706500e353c58ffb91f2684dd3/runtime/lua/vim/lsp/buf.lua#L689
+---@param bufnr integer buffer number
+---@param client_id integer lsp client id
+---@param params lsp.CodeActionParams code action params
+---@param action lsp.Command|lsp.CodeAction
+local function apply_code_action_sync(bufnr, client_id, params, action)
+    local timeout = 2000 --TODO break out into configuration
+
+    local client = vim.lsp.get_client_by_id(client_id)
+    if client == nil then
+        return
+    end
+
+    ---@type lsp.HandlerContext
+    local ctx = {
+        method = 'textDocument/codeAction',
+        client_id = client_id,
+        bufnr = bufnr,
+        params = params,
+    }
+    local reg = client.dynamic_capabilities:get('textDocument/codeAction', { bufnr = bufnr })
+
+    local supports_resolve = vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
+        or client.supports_method('codeAction/resolve')
+    if not action.edit and client and supports_resolve then
+        local response = client.request_sync('codeAction/resolve', action, timeout, bufnr)
+        if response == nil then
+            vim.notify("No lsp response to 'codeAction/resolve' request", vim.log.levels.WARN)
+            return
+        end
+        local err = response.err
+        local resolved_action = response.result
+        if err then
+            if action.command then
+                apply_action(action, client, ctx)
+            else
+                vim.notify(err.code .. ': ' .. err.message, vim.log.levels.ERROR)
+            end
+        else
+            apply_action(resolved_action, client, ctx)
+        end
+    else
+        apply_action(action, client, ctx)
+    end
+end
+
+local function find_code_action(action_identifier, code_actions_lsp_results)
+    for client_id, result in pairs(code_actions_lsp_results) do
+        local client = vim.lsp.get_client_by_id(client_id)
+        if client ~= nil and client.name == action_identifier.client_name then
+            for _, lsp_action in pairs(result.result or {}) do
+                --TODO convert the condition below into a function that can be overridden in the plugin configuration
+                if lsp_action.kind == action_identifier.kind and lsp_action.title == action_identifier.title then
+                    return { client_id = client_id, lsp_action = lsp_action }
+                end
+            end
+        end
+    end
+end
+
 ---@param opts CommandOpts
 function M.command_run_mark(opts)
     local mark_name = opts.args
@@ -279,20 +338,21 @@ function M.command_run_mark(opts)
         return
     end
 
-    vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
-        for client_id, result in pairs(results) do
-            local client = vim.lsp.get_client_by_id(client_id)
-            if client ~= nil and client.name == action_identifier.client_name then
-                for _, lsp_action in pairs(result.result or {}) do
-                    --TODO convert the condition below into a function that can be overridden in the plugin configuration
-                    if lsp_action.kind == action_identifier.kind and lsp_action.title == action_identifier.title then
-                        apply_code_action(bufnr, client_id, params, lsp_action)
-                        return
-                    end
-                end
-            end
+    local timeout = 2000 -- TODO extract into config
+    if opts.bang then
+        local results = vim.lsp.buf_request_sync(bufnr, 'textDocument/codeAction', params, timeout)
+        local code_action_info = find_code_action(action_identifier, results)
+        if code_action_info ~= nil then
+            apply_code_action_sync(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
         end
-    end)
+    else
+        vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
+            local code_action_info = find_code_action(action_identifier, results)
+            if code_action_info ~= nil then
+                apply_code_action(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
+            end
+        end)
+    end
 end
 
 function M.get_code_action_marks()

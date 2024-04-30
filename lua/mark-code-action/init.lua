@@ -25,6 +25,7 @@ M.setup = function(opts)
         nargs = 1,
         complete = action.get_code_action_marks,
         range = true,
+        bang = true,
     })
 
     vim.api.nvim_create_user_command('MarkCodeActionInspect', function(args)

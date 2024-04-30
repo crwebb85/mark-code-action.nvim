@@ -8,6 +8,9 @@
         alphanumeric character to distinguish it from configuration marks and
         prevent overriding what is in the configuration
 -   [x] add edit mark command
+-   [x] add running the code actions syncronously using bang
+-   [ ] extract timeout into config
+-   [ ] add type definitions to find_actions descriptions to sync functions
 -   [ ] add match strategies (title equals, contains, begins with, ends with, vimregex, lua regex, etc)
 -   [ ] add the ability to bind several actions to the same configuration mark.
         For example "RemoveUnusedImports" is a common action in many LSPs and
