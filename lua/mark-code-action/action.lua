@@ -340,18 +340,18 @@ function M.command_run_mark(opts)
 
     local timeout = 2000 -- TODO extract into config
     if opts.bang then
-        local results = vim.lsp.buf_request_sync(bufnr, 'textDocument/codeAction', params, timeout)
-        local code_action_info = find_code_action(action_identifier, results)
-        if code_action_info ~= nil then
-            apply_code_action_sync(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
-        end
-    else
         vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
             local code_action_info = find_code_action(action_identifier, results)
             if code_action_info ~= nil then
                 apply_code_action(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
             end
         end)
+    else
+        local results = vim.lsp.buf_request_sync(bufnr, 'textDocument/codeAction', params, timeout)
+        local code_action_info = find_code_action(action_identifier, results)
+        if code_action_info ~= nil then
+            apply_code_action_sync(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
+        end
     end
 end
 
