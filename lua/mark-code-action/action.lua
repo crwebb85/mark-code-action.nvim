@@ -52,6 +52,12 @@ end
 --- {0-9a-zA-Z}. If mark already exists, it will be overridden.
 ---@param opts MarkCodeAction.MarkSelectionOptions
 function M.mark_selection(opts)
+    local default_opts = {
+        bufnr = vim.api.nvim_get_current_buf(),
+        is_range_selection = false,
+    }
+    opts = vim.tbl_deep_extend('force', default_opts, opts)
+
     local params = build_code_action_params(opts.bufnr, opts.is_range_selection)
     vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
         ---@type MarkCodeAction.CodeActionIdentifier[]
@@ -293,7 +299,7 @@ function M.run_mark(opts)
         is_async = false,
     }
 
-    opts = vim.tbl_deep_extend('force', opts, default_opts)
+    opts = vim.tbl_deep_extend('force', default_opts, opts)
 
     local params = build_code_action_params(opts.bufnr, opts.is_range_selection)
     local action_identifier = code_action_marks[opts.mark_name]

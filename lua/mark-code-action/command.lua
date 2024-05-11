@@ -48,11 +48,11 @@ vim.api.nvim_create_user_command(
     ---@param opts MarkCodeAction.UserCommandOptions
     function(opts)
         local mark_name = opts.args
-
         action.run_mark({
             mark_name = mark_name,
             bufnr = vim.api.nvim_get_current_buf(),
             is_range_selection = (opts.range == 2),
+            is_async = opts.bang,
         })
     end,
     {
