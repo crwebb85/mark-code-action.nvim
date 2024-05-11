@@ -248,18 +248,23 @@ local function apply_code_action_sync(bufnr, client_id, params, action)
     local supports_resolve = vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
         or client.supports_method('codeAction/resolve')
     if not action.edit and client and supports_resolve then
-        local response = client.request_sync('codeAction/resolve', action, timeout, bufnr)
-        if response == nil then
-            vim.notify("No lsp response to 'codeAction/resolve' request", vim.log.levels.WARN)
-            return
+        local response, err = client.request_sync('codeAction/resolve', action, timeout, bufnr)
+
+        if err == 'timeout' then
+            error('Request timeout during codeAction/resolve request to LSP server', 1)
+        elseif err ~= nil then
+            error('Error during codeAction/resolve request to LSP server: ' .. err, 1)
+        elseif response == nil then
+            error('Did not receive response from LSP server for codeAction/resolve request', 1)
         end
-        local err = response.err
+
+        local lsp_err = response.err
         local resolved_action = response.result
-        if err then
+        if lsp_err then
             if action.command then
                 apply_action(action, client, ctx)
             else
-                vim.notify(err.code .. ': ' .. err.message, vim.log.levels.ERROR)
+                vim.notify(lsp_err.code .. ': ' .. lsp_err.message, vim.log.levels.ERROR)
             end
         else
             apply_action(resolved_action, client, ctx)
@@ -269,11 +274,10 @@ local function apply_code_action_sync(bufnr, client_id, params, action)
     end
 end
 
---TODO cleanup find_code_action types
 ---Finds the code action mark from the action identifier
 ---@private
 ---@param action_identifier MarkCodeAction.CodeActionIdentifier
----@param code_actions_lsp_results table<integer, {err: lsp.ResponseError, result: any}> result Map of client_id:request_result.
+---@param code_actions_lsp_results table<integer, {error: lsp.ResponseError, result: any}> result Map of client_id:request_result.
 ---@return table?
 local function find_code_action(action_identifier, code_actions_lsp_results)
     for client_id, result in pairs(code_actions_lsp_results) do
@@ -327,8 +331,18 @@ function M.run_mark(opts)
             end
         end)
     else
-        local results = vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, timeout)
-        -- TODO results is nil when it timesout. Add checks and timeout configuration
+        local results, err = vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, timeout)
+
+        if err == 'timeout' then
+            error('Request timeout while fetching available code actions from LSP server', 1)
+        elseif err ~= nil then
+            error('Error while fetching available code actions from LSP server: ' .. err, 1)
+        elseif results == nil then
+            error('Did not receive response from LSP server when fetching available code actions', 1)
+        end
+
+        ---TODO remove diagnostic disable after neovim types are fixed
+        ---@diagnostic disable-next-line: param-type-mismatch neovim repo has incorrect type definition for vim.lsp.buf_request_sync for result[client_id].err which should be result[client_id].error
         local code_action_info = find_code_action(action_identifier, results)
         if code_action_info ~= nil then
             apply_code_action_sync(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
