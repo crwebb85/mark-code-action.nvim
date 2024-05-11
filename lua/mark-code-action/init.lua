@@ -40,7 +40,7 @@ M.setup = function(opts)
     config = vim.tbl_deep_extend('force', config, opts or {})
     action.merge_code_action_marks(config)
 
-    require('mark-code-action.commands') -- load commands
+    require('mark-code-action.command') -- load commands
 end
 
 M.get_code_action_identifier_by_mark = action.get_code_action_identifier_by_mark
