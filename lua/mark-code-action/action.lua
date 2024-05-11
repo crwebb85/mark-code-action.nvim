@@ -1,45 +1,17 @@
 local M = {}
 
----@class CodeActionIdentifier
----@field client_id? number id of the lsp client (at the time of making the mark)
----@field client_name string name of the lsp client
----@field kind string lsp action kind
----@field title string lsp action title
----@field full_action? lsp.Command|lsp.CodeAction of the lsp code action (at the time of making the mark)
-
----@class CommandOpts
----@field name string
----@field args string
----@field fargs string[]
----@field bang boolean
----@field line1 number
----@field line2 number
----@field range number
----@field count number
----@field reg string
----@field mods string
----@field smods string[]
-
----@alias CodeActionMark string
-
----@alias LinePosition integer[]  in the form {row, col} using (1, 0) indexing
-
----@class TextRange
----@field start LinePosition
----@field end LinePosition
-
----@type {[CodeActionMark]: CodeActionIdentifier}
+---@type {[MarkCodeAction.CodeActionMark]: MarkCodeAction.CodeActionIdentifier}
 local code_action_marks = {} -- Stores the code action marks
 
 ---Merges the code action marks defined in the configuration to the list of code action marks
----@param opts MarkCodeActionConfig
+---@param opts MarkCodeAction.MarkCodeActionConfig
 function M.merge_code_action_marks(opts)
     code_action_marks = vim.tbl_deep_extend('force', code_action_marks, opts.marks or {})
 end
 
 ---@private
 ---@param bufnr integer
----@return TextRange {start={row, col}, end={row, col}} using (1, 0) indexing
+---@return MarkCodeAction.TextRange {start={row, col}, end={row, col}} using (1, 0) indexing
 local function range_from_selection(bufnr)
     local start_pos = vim.api.nvim_buf_get_mark(bufnr, '<')
     local start_row = start_pos[1]
@@ -75,26 +47,14 @@ local function build_code_action_params(bufnr, is_range)
     return params
 end
 
---- Prompts the user for a code action to mark and marks it with the user
+--- Prompts the user to select a code action to mark and marks it with the user
 --- provided mark name. The mark name must be a single letter within the set
---- {0-9a-zA-Z}. This function will override an already exists mark if it exists.
---- @param opts CommandOpts
-function M.command_mark(opts)
-    local mark_name = opts.fargs[1]
-    mark_name = mark_name:gsub('%s+', '') -- strip whitespace
-
-    if string.match(mark_name, '%w') == nil or string.len(mark_name) ~= 1 then
-        vim.notify('Mark name must be a single character within the set {0-9a-zA-Z}.', vim.log.levels.ERROR)
-        return
-    end
-
-    local bufnr = vim.api.nvim_get_current_buf()
-
-    local is_range = (opts.range == 2)
-    local params = build_code_action_params(bufnr, is_range)
-
-    vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
-        ---@type CodeActionIdentifier[]
+--- {0-9a-zA-Z}. If mark already exists, it will be overridden.
+---@param opts MarkCodeAction.MarkSelectionOptions
+function M.mark_selection(opts)
+    local params = build_code_action_params(opts.bufnr, opts.is_range_selection)
+    vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
+        ---@type MarkCodeAction.CodeActionIdentifier[]
         local actions = {}
 
         ---@type string[]
@@ -105,7 +65,7 @@ function M.command_mark(opts)
             local client = vim.lsp.get_client_by_id(client_id)
             if client ~= nil then
                 for _, lsp_action in pairs(result.result or {}) do
-                    ---@type CodeActionIdentifier
+                    ---@type MarkCodeAction.CodeActionIdentifier
                     local action_identifier = {
                         client_id = client_id,
                         client_name = client.name,
@@ -137,11 +97,12 @@ function M.command_mark(opts)
             return
         end
 
-        code_action_marks[mark_name] = selected_action
+        code_action_marks[opts.mark_name] = selected_action
     end)
 end
 
 ---Finds the buffer number for the buffer with given buffer name
+---@private
 ---@param name string buffer name
 ---@return integer bufnr
 local find_bufnr_by_name = function(name)
@@ -158,7 +119,7 @@ local find_bufnr_by_name = function(name)
 end
 
 ---Opens the code action editor for the given mark name
----@param mark CodeActionMark
+---@param mark MarkCodeAction.CodeActionMark
 function M.open_code_action_editor(mark)
     local buf_name = 'MarkCodeActionEdit: ' .. mark
 
@@ -198,6 +159,7 @@ function M.open_code_action_editor(mark)
 end
 
 --- based on https://github.com/neovim/neovim/blob/8e5c48b08dad54706500e353c58ffb91f2684dd3/runtime/lua/vim/lsp/buf.lua#L677
+---@private
 ---@param action lsp.Command|lsp.CodeAction
 ---@param client vim.lsp.Client
 ---@param ctx lsp.HandlerContext
@@ -214,6 +176,7 @@ local function apply_action(action, client, ctx)
 end
 
 --- based on https://github.com/neovim/neovim/blob/8e5c48b08dad54706500e353c58ffb91f2684dd3/runtime/lua/vim/lsp/buf.lua#L689
+---@private
 ---@param bufnr integer buffer number
 ---@param client_id integer lsp client id
 ---@param params lsp.CodeActionParams code action params
@@ -254,6 +217,7 @@ local function apply_code_action(bufnr, client_id, params, action)
 end
 
 --- based on https://github.com/neovim/neovim/blob/8e5c48b08dad54706500e353c58ffb91f2684dd3/runtime/lua/vim/lsp/buf.lua#L689
+---@private
 ---@param bufnr integer buffer number
 ---@param client_id integer lsp client id
 ---@param params lsp.CodeActionParams code action params
@@ -299,6 +263,12 @@ local function apply_code_action_sync(bufnr, client_id, params, action)
     end
 end
 
+--TODO cleanup find_code_action types
+---Finds the code action mark from the action identifier
+---@private
+---@param action_identifier MarkCodeAction.CodeActionIdentifier
+---@param code_actions_lsp_results table<integer, {err: lsp.ResponseError, result: any}> result Map of client_id:request_result.
+---@return table?
 local function find_code_action(action_identifier, code_actions_lsp_results)
     for client_id, result in pairs(code_actions_lsp_results) do
         local client = vim.lsp.get_client_by_id(client_id)
@@ -311,25 +281,29 @@ local function find_code_action(action_identifier, code_actions_lsp_results)
             end
         end
     end
+    return nil
 end
 
----@param opts CommandOpts
-function M.command_run_mark(opts)
-    local mark_name = opts.args
+---Run the code action mark
+---@param opts MarkCodeAction.RunMarkOptions
+function M.run_mark(opts)
+    local default_opts = {
+        bufnr = vim.api.nvim_get_current_buf(),
+        is_range_selection = false,
+        is_async = false,
+    }
 
-    local bufnr = vim.api.nvim_get_current_buf()
+    opts = vim.tbl_deep_extend('force', opts, default_opts)
 
-    local is_range = (opts.range == 2)
-    local params = build_code_action_params(bufnr, is_range)
-
-    local action_identifier = code_action_marks[mark_name]
+    local params = build_code_action_params(opts.bufnr, opts.is_range_selection)
+    local action_identifier = code_action_marks[opts.mark_name]
     if action_identifier == nil then
         vim.notify('Mark name does not exist.', vim.log.levels.ERROR)
         return
     end
 
     local clients = vim.lsp.get_clients({
-        bufnr = bufnr,
+        bufnr = opts.bufnr,
         method = 'textDocument/codeAction',
     })
     local remaining = #clients
@@ -339,22 +313,25 @@ function M.command_run_mark(opts)
     end
 
     local timeout = 2000 -- TODO extract into config
-    if opts.bang then
-        vim.lsp.buf_request_all(bufnr, 'textDocument/codeAction', params, function(results)
+    if opts.is_async then
+        vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
             local code_action_info = find_code_action(action_identifier, results)
             if code_action_info ~= nil then
-                apply_code_action(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
+                apply_code_action(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
             end
         end)
     else
-        local results = vim.lsp.buf_request_sync(bufnr, 'textDocument/codeAction', params, timeout)
+        local results = vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, timeout)
+        -- TODO results is nil when it timesout. Add checks and timeout configuration
         local code_action_info = find_code_action(action_identifier, results)
         if code_action_info ~= nil then
-            apply_code_action_sync(bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
+            apply_code_action_sync(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
         end
     end
 end
 
+---Get the list of codeaction mark names
+---@return string[]
 function M.get_code_action_marks()
     local marks = {}
     for mark, _ in pairs(code_action_marks) do
@@ -363,8 +340,8 @@ function M.get_code_action_marks()
     return marks
 end
 
----@param mark CodeActionMark
----@return CodeActionIdentifier
+---@param mark MarkCodeAction.CodeActionMark
+---@return MarkCodeAction.CodeActionIdentifier
 function M.get_code_action_identifier_by_mark(mark)
     return code_action_marks[mark]
 end

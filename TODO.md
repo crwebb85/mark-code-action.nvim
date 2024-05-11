@@ -25,7 +25,7 @@
 -   [ ] add global mark syncing commands (need to think through how I want that
         to work)
 -   [ ] add action picker override to configuration
--   [ ] add a namespace to types to prevent conflicts with user defined types
+-   [x] add a namespace to types to prevent conflicts with user defined types
 -   [ ] commit to a vocabulary (like whether the mark is the word used to select
         the action or the pair of the selection word and action identifier)
 -   [ ] add readme

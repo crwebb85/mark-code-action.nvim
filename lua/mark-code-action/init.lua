@@ -1,50 +1,46 @@
 local action = require('mark-code-action.action')
 
----@class MarkCodeActionAPI
+---@class MarkCodeAction.CodeActionIdentifier
+---@field client_id? number id of the lsp client (at the time of making the mark)
+---@field client_name string name of the lsp client
+---@field kind string lsp action kind
+---@field title string lsp action title
+---@field full_action? lsp.Command|lsp.CodeAction of the lsp code action (at the time of making the mark)
+
+---@alias MarkCodeAction.CodeActionMark string
+
+---@alias MarkCodeAction.LinePosition integer[]  in the form {row, col} using (1, 0) indexing
+
+---@class MarkCodeAction.TextRange
+---@field start MarkCodeAction.LinePosition
+---@field end MarkCodeAction.LinePosition
+
+---@class MarkCodeAction.RunMarkOptions
+---@field mark_name string name of mark
+---@field bufnr integer? buffer number (default = 0)
+---@field is_range_selection boolean? whether to use range params to select code action (default = false)
+---@field is_async boolean? whether to run lsp commands asyncronously (default = false)
+
+---@class MarkCodeAction.MarkSelectionOptions
+---@field mark_name string name of mark
+---@field bufnr integer? buffer number (default=0)
+---@field is_range_selection boolean? whether to use range params to select code action (default = false)
+
+---@class MarkCodeAction.MarkCodeActionAPI
 local M = {}
 
----@class MarkCodeActionConfig
----@field marks? {[CodeActionMark]: CodeActionIdentifier}
+---@class MarkCodeAction.MarkCodeActionConfig
+---@field marks? {[MarkCodeAction.CodeActionMark]: MarkCodeAction.CodeActionIdentifier}
 local config = {
     marks = {},
 }
 
----@param opts MarkCodeActionConfig?
+---@param opts MarkCodeAction.MarkCodeActionConfig?
 M.setup = function(opts)
     config = vim.tbl_deep_extend('force', config, opts or {})
     action.merge_code_action_marks(config)
 
-    vim.api.nvim_create_user_command('MarkCodeActionMark', action.command_mark, {
-        desc = 'Marks a Code Action item',
-        nargs = 1,
-        range = true,
-    })
-
-    vim.api.nvim_create_user_command('MarkCodeActionRun', action.command_run_mark, {
-        desc = 'Runs a Code Action Mark',
-        nargs = 1,
-        complete = action.get_code_action_marks,
-        range = true,
-        bang = true,
-    })
-
-    vim.api.nvim_create_user_command('MarkCodeActionInspect', function(args)
-        local mark = args.args
-        vim.print(action.get_code_action_identifier_by_mark(mark))
-    end, {
-        desc = 'Inspects a Code Action Mark',
-        nargs = 1,
-        complete = action.get_code_action_marks,
-    })
-
-    vim.api.nvim_create_user_command('MarkCodeActionEdit', function(args)
-        local mark = args.args
-        action.open_code_action_editor(mark)
-    end, {
-        desc = 'Edits a Code Action Mark',
-        nargs = 1,
-        complete = action.get_code_action_marks,
-    })
+    require('mark-code-action.commands') -- load commands
 end
 
 M.get_code_action_identifier_by_mark = action.get_code_action_identifier_by_mark
