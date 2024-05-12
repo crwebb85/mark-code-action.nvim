@@ -1,5 +1,5 @@
 local action = require('mark-code-action.action')
-
+local config = require('mark-code-action.config')
 ---Type definitions for the params that neovim passes to a user commands callback
 ---@class MarkCodeAction.UserCommandOptions
 ---@field name string
@@ -53,6 +53,7 @@ vim.api.nvim_create_user_command(
             bufnr = vim.api.nvim_get_current_buf(),
             is_range_selection = (opts.range == 2),
             is_async = opts.bang,
+            lsp_timeout_ms = config.get_config().lsp_timeout_ms,
         })
     end,
     {

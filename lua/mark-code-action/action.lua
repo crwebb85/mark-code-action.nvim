@@ -228,9 +228,8 @@ end
 ---@param client_id integer lsp client id
 ---@param params lsp.CodeActionParams code action params
 ---@param action lsp.Command|lsp.CodeAction
-local function apply_code_action_sync(bufnr, client_id, params, action)
-    local timeout = 2000 --TODO break out into configuration
-
+---@param timeout_ms integer the timeout in milliseconds used when making syncronous lsp requests
+local function apply_code_action_sync(bufnr, client_id, params, action, timeout_ms)
     local client = vim.lsp.get_client_by_id(client_id)
     if client == nil then
         return
@@ -248,7 +247,7 @@ local function apply_code_action_sync(bufnr, client_id, params, action)
     local supports_resolve = vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
         or client.supports_method('codeAction/resolve')
     if not action.edit and client and supports_resolve then
-        local response, err = client.request_sync('codeAction/resolve', action, timeout, bufnr)
+        local response, err = client.request_sync('codeAction/resolve', action, timeout_ms, bufnr)
 
         if err == 'timeout' then
             error('Request timeout during codeAction/resolve request to LSP server', 1)
@@ -301,6 +300,7 @@ function M.run_mark(opts)
         bufnr = vim.api.nvim_get_current_buf(),
         is_range_selection = false,
         is_async = false,
+        lsp_timeout_ms = 2000,
     }
 
     opts = vim.tbl_deep_extend('force', default_opts, opts)
@@ -322,7 +322,6 @@ function M.run_mark(opts)
         return
     end
 
-    local timeout = 2000 -- TODO extract into config
     if opts.is_async then
         vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
             local code_action_info = find_code_action(action_identifier, results)
@@ -331,7 +330,8 @@ function M.run_mark(opts)
             end
         end)
     else
-        local results, err = vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, timeout)
+        local results, err =
+            vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, opts.lsp_timeout_ms)
 
         if err == 'timeout' then
             error('Request timeout while fetching available code actions from LSP server', 1)
@@ -345,7 +345,13 @@ function M.run_mark(opts)
         ---@diagnostic disable-next-line: param-type-mismatch neovim repo has incorrect type definition for vim.lsp.buf_request_sync for result[client_id].err which should be result[client_id].error
         local code_action_info = find_code_action(action_identifier, results)
         if code_action_info ~= nil then
-            apply_code_action_sync(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
+            apply_code_action_sync(
+                opts.bufnr,
+                code_action_info.client_id,
+                params,
+                code_action_info.lsp_action,
+                opts.lsp_timeout_ms
+            )
         end
     end
 end
