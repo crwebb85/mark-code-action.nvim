@@ -9,7 +9,10 @@
         prevent overriding what is in the configuration
 -   [x] add edit mark command
 -   [x] add running the code actions syncronously using bang
--   [ ] extract timeout into config
+-   [x] extract timeout into config
+-   [ ] determine how best to allow the user to change the timeout.
+        I am considering either a command for setting the timeout or pass it
+        into the run command as an optional argument
 -   [x] add type definitions to find_actions descriptions to sync functions
 -   [ ] add match strategies (title equals, contains, begins with, ends with, vimregex, lua regex, etc)
 -   [ ] add the ability to bind several actions to the same configuration mark.
