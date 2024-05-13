@@ -1,5 +1,7 @@
 local M = {}
 
+local picker_api = require('mark-code-action.pickers')
+
 ---@type {[MarkCodeAction.CodeActionMark]: MarkCodeAction.CodeActionIdentifier}
 local code_action_marks = {} -- Stores the code action marks
 
@@ -273,26 +275,6 @@ local function apply_code_action_sync(bufnr, client_id, params, action, timeout_
     end
 end
 
----Finds the code action mark from the action identifier
----@private
----@param action_identifier MarkCodeAction.CodeActionIdentifier
----@param code_actions_lsp_results table<integer, {error: lsp.ResponseError, result: any}> result Map of client_id:request_result.
----@return table?
-local function find_code_action(action_identifier, code_actions_lsp_results)
-    for client_id, result in pairs(code_actions_lsp_results) do
-        local client = vim.lsp.get_client_by_id(client_id)
-        if client ~= nil and client.name == action_identifier.client_name then
-            for _, lsp_action in pairs(result.result or {}) do
-                --TODO convert the condition below into a function that can be overridden in the plugin configuration
-                if lsp_action.kind == action_identifier.kind and lsp_action.title == action_identifier.title then
-                    return { client_id = client_id, lsp_action = lsp_action }
-                end
-            end
-        end
-    end
-    return nil
-end
-
 ---Run the code action mark
 ---@param opts MarkCodeAction.RunMarkOptions
 function M.run_mark(opts)
@@ -324,7 +306,7 @@ function M.run_mark(opts)
 
     if opts.is_async then
         vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
-            local code_action_info = find_code_action(action_identifier, results)
+            local code_action_info = picker_api.find_code_action(action_identifier, results)
             if code_action_info ~= nil then
                 apply_code_action(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
             end
@@ -343,7 +325,7 @@ function M.run_mark(opts)
 
         ---TODO remove diagnostic disable after neovim types are fixed
         ---@diagnostic disable-next-line: param-type-mismatch neovim repo has incorrect type definition for vim.lsp.buf_request_sync for result[client_id].err which should be result[client_id].error
-        local code_action_info = find_code_action(action_identifier, results)
+        local code_action_info = picker_api.find_code_action(action_identifier, results)
         if code_action_info ~= nil then
             apply_code_action_sync(
                 opts.bufnr,

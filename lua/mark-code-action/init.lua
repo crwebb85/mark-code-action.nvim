@@ -7,6 +7,7 @@ local config = require('mark-code-action.config')
 ---@field kind string lsp action kind
 ---@field title string lsp action title
 ---@field full_action? lsp.Command|lsp.CodeAction of the lsp code action (at the time of making the mark)
+---@field picker? string picker name
 
 ---@alias MarkCodeAction.CodeActionMark string
 
@@ -27,6 +28,12 @@ local config = require('mark-code-action.config')
 ---@field mark_name string name of mark
 ---@field bufnr integer? buffer number (default=0)
 ---@field is_range_selection boolean? whether to use range params to select code action (default = false)
+
+---@alias MarkCodeAction.CodeActionPicker fun(action_identifier: MarkCodeAction.CodeActionIdentifier, code_action: lsp.CodeAction, client_id: integer): boolean
+
+---@class MarkCodeAction.PickedCodeAction
+---@field client_id integer
+---@field lsp_action lsp.CodeAction
 
 ---@class MarkCodeAction.MarkCodeActionAPI
 local M = {}
