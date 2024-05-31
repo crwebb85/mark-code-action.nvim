@@ -323,8 +323,6 @@ function M.run_mark(opts)
             error('Did not receive response from LSP server when fetching available code actions', 1)
         end
 
-        ---TODO remove diagnostic disable after neovim types are fixed
-        ---@diagnostic disable-next-line: param-type-mismatch neovim repo has incorrect type definition for vim.lsp.buf_request_sync for result[client_id].err which should be result[client_id].error
         local code_action_info = picker_api.find_code_action(action_identifier, results)
         if code_action_info ~= nil then
             apply_code_action_sync(
