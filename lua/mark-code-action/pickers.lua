@@ -1,14 +1,57 @@
 local M = {}
 
+---Is string prefix
+---@param s string
+---@param prefix string
+---@return boolean
+local function is_prefix(s, prefix)
+    return string.sub(s, 1, string.len(prefix)) == prefix
+end
+
+---Is string suffix
+---@param s string
+---@param suffix string
+---@return boolean
+local function is_suffix(s, suffix)
+    return string.sub(s, -#suffix) == suffix
+end
+
 ---@type table<string,MarkCodeAction.CodeActionPicker>
 local pickers = {
-    default = function(action_identifier, code_action, client_id)
+    equals = function(action_identifier, code_action, client_id)
         local client = vim.lsp.get_client_by_id(client_id)
         return client ~= nil
             and client.name == action_identifier.client_name
             and code_action.kind == action_identifier.kind
             and code_action.title == action_identifier.title
     end,
+
+    contains = function(action_identifier, code_action, client_id)
+        local client = vim.lsp.get_client_by_id(client_id)
+        return client ~= nil
+            and client.name == action_identifier.client_name
+            and code_action.kind == action_identifier.kind
+            and string.find(code_action.title, action_identifier.title) ~= nil
+    end,
+    begins_with = function(action_identifier, code_action, client_id)
+        local client = vim.lsp.get_client_by_id(client_id)
+        return client ~= nil
+            and client.name == action_identifier.client_name
+            and code_action.kind == action_identifier.kind
+            and is_prefix(code_action.title, action_identifier.title)
+    end,
+    ends_with = function(action_identifier, code_action, client_id)
+        local client = vim.lsp.get_client_by_id(client_id)
+        return client ~= nil
+            and client.name == action_identifier.client_name
+            and code_action.kind == action_identifier.kind
+            and is_suffix(code_action.title, action_identifier.title)
+    end,
+    --TODO instead of using code_action.title in ends_with, begins_with, and contains
+    --pickers, use fields specific to those pickers and have the MarkCodeActionMark
+    --command prompt the user to supply them
+
+    -- TODO add vimregex and lua regex pickers
 }
 
 ---Is the code action picked based on the code action identifier
@@ -18,7 +61,7 @@ local pickers = {
 local function is_picked(action_identifier, code_action, client_id)
     local picker = nil
     if action_identifier.picker == nil then
-        picker = pickers['default']
+        picker = pickers['equals']
     else
         picker = pickers[action_identifier.picker]
     end
