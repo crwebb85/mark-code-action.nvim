@@ -1,4 +1,5 @@
 local action = require('mark-code-action.action')
+local renamer = require('mark-code-action.renamer')
 local config = require('mark-code-action.config')
 ---Type definitions for the params that neovim passes to a user commands callback
 ---@class MarkCodeAction.UserCommandOptions
@@ -81,4 +82,19 @@ end, {
     desc = 'Edits a Code Action Mark',
     nargs = 1,
     complete = action.get_code_action_marks,
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionRename', function(opts)
+    local name = opts.args
+
+    renamer.rename(nil, {
+        name = nil,
+        bufnr = nil,
+        filter = nil,
+        timeout_ms = 2000,
+    })
+end, {
+    desc = 'Renames',
+    nargs = '?',
+    complete = function() end,
 })

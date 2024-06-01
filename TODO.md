@@ -37,6 +37,7 @@
 -   [ ] add tests
 -   [ ] add CI pipeline
 -   [ ] add issue template
+-   [x] add syncronous lsp renaming
 
 # Guiding Principals
 
