@@ -243,7 +243,9 @@ function M.rename(new_name, opts)
         opts.client_name = prompt.client_name
         apply_rename(name, opts)
     end)
+
     vim.cmd([[:startinsert]])
+    vim.api.nvim_win_set_cursor(rename_prompt_win, { 1, string.len(prompt.prompt) })
 end
 
 return M
