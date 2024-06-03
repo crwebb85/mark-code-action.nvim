@@ -1,3 +1,5 @@
+local config = require('mark-code-action.config')
+
 local M = {}
 local ms = vim.lsp.protocol.Methods
 
@@ -155,6 +157,7 @@ local function apply_rename(name, opts)
     opts = opts or {}
     local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
     local win = opts.win or vim.api.nvim_get_current_win()
+    local lsp_timeout_ms = opts.lsp_timeout_ms or config.get_config().lsp_timeout_ms
 
     local clients = vim.lsp.get_clients({
         bufnr = bufnr,
@@ -171,33 +174,34 @@ local function apply_rename(name, opts)
         return nil, 'No valid lsp client attached'
     end
 
+    local error_message = 'During textDocument/rename request:\n'
     for _, client in ipairs(clients) do
         local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
         params.newName = name
-        local response, err = client.request_sync(ms.textDocument_rename, params, opts.lsp_timeout_ms, bufnr)
+        local response, err = client.request_sync(ms.textDocument_rename, params, lsp_timeout_ms, bufnr)
         if err == 'timeout' then
-            vim.notify('Request timeout during textDocument/rename request to LSP server', vim.log.levels.WARN)
+            error_message = error_message .. client.name .. ' timed out\n'
         elseif err ~= nil then
-            vim.notify('Error during textDocument/rename request to LSP server: ' .. err, vim.log.levels.WARN)
+            error_message = error_message .. client.name .. ' had client err ' .. err .. '\n'
         elseif response == nil then
-            vim.notify('Did not receive response from LSP server for textDocument/rename request', vim.log.levels.WARN)
+            error_message = error_message .. client.name .. ' client returned an empty response\n'
         elseif response.err ~= nil then
-            vim.notify(
-                'Error during textDocument/rename request to LSP server: '
-                    .. response.err.code
-                    .. ': '
-                    .. response.err.message,
-                vim.log.levels.WARN
-            )
+            error_message = error_message
+                .. client.name
+                .. ' server sent an the error '
+                .. response.err.code
+                .. ':'
+                .. response.err.message
+                .. '\n'
         elseif response.result == nil then
-            vim.notify('Did not receive response from LSP server for textDocument/rename request', vim.log.levels.WARN)
+            error_message = error_message .. client.name .. ' server sent an empty result\n'
         elseif response.result ~= nil then
             --Not going to create my own version of apply_workspace_edit unless I find out it is doing some problematic async operations
             vim.lsp.util.apply_workspace_edit(response.result, client.offset_encoding)
             return true, nil
         end
     end
-    return nil, 'Something went wrong'
+    return nil, error_message
 end
 
 --- Renames all references to the symbol under the cursor.
@@ -209,7 +213,7 @@ function M.rename(new_name, opts)
     local default_opts = {
         bufnr = vim.api.nvim_get_current_buf(),
         win = vim.api.nvim_get_current_win(),
-        lsp_timeout_ms = 2000,
+        lsp_timeout_ms = config.get_config().lsp_timeout_ms,
     }
 
     opts = vim.tbl_deep_extend('force', default_opts, opts or {})
@@ -251,10 +255,15 @@ function M.rename(new_name, opts)
         height = 1,
     })
     vim.wo[rename_prompt_win].winfixbuf = true
-    vim.fn.prompt_setcallback(rename_prompt_bufnr, function(name)
-        name = vim.trim(name)
+
+    --Cannot use vim.fn.prompt_setcallback because errors in the callback will
+    --not stop the running macro but I need it to stop the macro
+    vim.keymap.set({ 'i' }, '<CR>', function()
+        local lines = vim.api.nvim_buf_get_lines(rename_prompt_bufnr, 0, -1, true)
+        local name = vim.trim(lines[1])
+
         if name == '' then
-            vim.notify('Rename operation canceled', vim.log.levels.WARN)
+            vim.notify('Rename operation canceled', vim.log.levels.INFO)
         end
 
         if vim.api.nvim_win_is_valid(opts.win) then
@@ -276,7 +285,10 @@ function M.rename(new_name, opts)
         if apply_rename_err ~= nil then
             error(apply_rename_err, vim.log.levels.ERROR)
         end
-    end)
+    end, {
+        desc = 'Confirm rename prompt',
+        buffer = rename_prompt_bufnr,
+    })
 
     vim.cmd([[:startinsert]])
     vim.api.nvim_win_set_cursor(rename_prompt_win, { 1, string.len(prompt.prompt) })
