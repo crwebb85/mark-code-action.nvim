@@ -1,4 +1,5 @@
 local M = {}
+local ms = vim.lsp.protocol.Methods
 
 ---@class MarkCodeAction.rename.Opts
 ---
@@ -73,11 +74,11 @@ local function get_default_rename_prompt(opts)
     local prepared_rename_had_other_errors = false
     local potential_prompt = nil
     for _, client in ipairs(clients) do
-        if client.supports_method('textDocument_prepareRename') then
+        if client.supports_method(ms.textDocument_prepareRename) then
             local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
 
             ---@type { err: lsp.ResponseError|nil, result: lsp.prepareRename.Result|nil  }|nil, string|nil
-            local response, err = client.request_sync('textDocument/prepareRename', params, opts.timeout_ms, bufnr)
+            local response, err = client.request_sync(ms.textDocument_prepareRename, params, opts.timeout_ms, bufnr)
 
             --Not getting a good response from one of the LSP servers is not show stopping
             --since we will just check the next LSP but I think it is a good idea to at least warn the user
@@ -102,7 +103,10 @@ local function get_default_rename_prompt(opts)
             elseif response.err ~= nil then
                 prepared_rename_had_other_errors = true
                 vim.notify(
-                    'Error during textDocument/prepareRename request to LSP server: ' .. response.err,
+                    'Error during textDocument/prepareRename request to LSP server: '
+                        .. response.err.code
+                        .. ': '
+                        .. response.err.message,
                     vim.log.levels.WARN
                 )
             elseif response.result == nil then
@@ -156,7 +160,7 @@ local function apply_rename(name, opts)
         bufnr = bufnr,
         name = opts.client_name,
         -- Clients must at least support rename, prepareRename is optional
-        method = 'textDocument/rename',
+        method = ms.textDocument_rename,
     })
     if opts.filter then
         clients = vim.tbl_filter(opts.filter, clients)
@@ -170,7 +174,7 @@ local function apply_rename(name, opts)
     for _, client in ipairs(clients) do
         local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
         params.newName = name
-        local response, err = client.request_sync('textDocument/rename', params, opts.timeout_ms, bufnr)
+        local response, err = client.request_sync(ms.textDocument_rename, params, opts.timeout_ms, bufnr)
         vim.print(client.name, response, err)
         if err == 'timeout' then
             vim.notify('Request timeout during textDocument/rename request to LSP server', vim.log.levels.WARN)
@@ -179,7 +183,13 @@ local function apply_rename(name, opts)
         elseif response == nil then
             vim.notify('Did not receive response from LSP server for textDocument/rename request', vim.log.levels.WARN)
         elseif response.err ~= nil then
-            vim.notify('Error during textDocument/rename request to LSP server: ' .. response.err, vim.log.levels.WARN)
+            vim.notify(
+                'Error during textDocument/rename request to LSP server: '
+                    .. response.err.code
+                    .. ': '
+                    .. response.err.message,
+                vim.log.levels.WARN
+            )
         elseif response.result == nil then
             vim.notify('Did not receive response from LSP server for textDocument/rename request', vim.log.levels.WARN)
         elseif response.result ~= nil then

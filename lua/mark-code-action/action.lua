@@ -1,6 +1,7 @@
 local M = {}
 
 local picker_api = require('mark-code-action.pickers')
+local ms = vim.lsp.protocol.Methods
 
 ---@type {[MarkCodeAction.CodeActionMark]: MarkCodeAction.CodeActionIdentifier}
 local code_action_marks = {} -- Stores the code action marks
@@ -61,7 +62,7 @@ function M.mark_selection(opts)
     opts = vim.tbl_deep_extend('force', default_opts, opts)
 
     local params = build_code_action_params(opts.bufnr, opts.is_range_selection)
-    vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
+    vim.lsp.buf_request_all(opts.bufnr, ms.textDocument_codeAction, params, function(results)
         ---@type MarkCodeAction.CodeActionIdentifier[]
         local actions = {}
 
@@ -197,15 +198,15 @@ local function apply_code_action(bufnr, client_id, params, action)
 
     ---@type lsp.HandlerContext
     local ctx = {
-        method = 'textDocument/codeAction',
+        method = ms.textDocument_codeAction,
         client_id = client_id,
         bufnr = bufnr,
         params = params,
     }
-    local reg = client.dynamic_capabilities:get('textDocument/codeAction', { bufnr = bufnr })
+    local reg = client.dynamic_capabilities:get(ms.textDocument_codeAction, { bufnr = bufnr })
 
     local supports_resolve = vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
-        or client.supports_method('codeAction/resolve')
+        or client.supports_method(ms.codeAction_resolve)
 
     if not action.edit and client and supports_resolve then
         client.request('codeAction/resolve', action, function(err, resolved_action)
@@ -239,17 +240,17 @@ local function apply_code_action_sync(bufnr, client_id, params, action, timeout_
 
     ---@type lsp.HandlerContext
     local ctx = {
-        method = 'textDocument/codeAction',
+        method = ms.textDocument_codeAction,
         client_id = client_id,
         bufnr = bufnr,
         params = params,
     }
-    local reg = client.dynamic_capabilities:get('textDocument/codeAction', { bufnr = bufnr })
+    local reg = client.dynamic_capabilities:get(ms.textDocument_codeAction, { bufnr = bufnr })
 
     local supports_resolve = vim.tbl_get(reg or {}, 'registerOptions', 'resolveProvider')
-        or client.supports_method('codeAction/resolve')
+        or client.supports_method(ms.codeAction_resolve)
     if not action.edit and client and supports_resolve then
-        local response, err = client.request_sync('codeAction/resolve', action, timeout_ms, bufnr)
+        local response, err = client.request_sync(ms.codeAction_resolve, action, timeout_ms, bufnr)
 
         if err == 'timeout' then
             error('Request timeout during codeAction/resolve request to LSP server', 1)
@@ -296,7 +297,7 @@ function M.run_mark(opts)
 
     local clients = vim.lsp.get_clients({
         bufnr = opts.bufnr,
-        method = 'textDocument/codeAction',
+        method = ms.textDocument_codeAction,
     })
     local remaining = #clients
     if remaining == 0 then
@@ -305,7 +306,7 @@ function M.run_mark(opts)
     end
 
     if opts.is_async then
-        vim.lsp.buf_request_all(opts.bufnr, 'textDocument/codeAction', params, function(results)
+        vim.lsp.buf_request_all(opts.bufnr, ms.textDocument_codeAction, params, function(results)
             local code_action_info = picker_api.find_code_action(action_identifier, results)
             if code_action_info ~= nil then
                 apply_code_action(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
@@ -313,7 +314,7 @@ function M.run_mark(opts)
         end)
     else
         local results, err =
-            vim.lsp.buf_request_sync(opts.bufnr, 'textDocument/codeAction', params, opts.lsp_timeout_ms)
+            vim.lsp.buf_request_sync(opts.bufnr, ms.textDocument_codeAction, params, opts.lsp_timeout_ms)
 
         if err == 'timeout' then
             error('Request timeout while fetching available code actions from LSP server', 1)
