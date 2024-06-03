@@ -53,7 +53,6 @@ vim.api.nvim_create_user_command(
             mark_name = mark_name,
             bufnr = vim.api.nvim_get_current_buf(),
             is_range_selection = (opts.range == 2),
-            is_async = opts.bang,
             lsp_timeout_ms = config.get_config().lsp_timeout_ms,
         })
     end,

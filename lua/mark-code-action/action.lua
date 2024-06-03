@@ -282,7 +282,6 @@ function M.run_mark(opts)
     local default_opts = {
         bufnr = vim.api.nvim_get_current_buf(),
         is_range_selection = false,
-        is_async = false,
         lsp_timeout_ms = 2000,
     }
 
@@ -305,35 +304,25 @@ function M.run_mark(opts)
         return
     end
 
-    if opts.is_async then
-        vim.lsp.buf_request_all(opts.bufnr, ms.textDocument_codeAction, params, function(results)
-            local code_action_info = picker_api.find_code_action(action_identifier, results)
-            if code_action_info ~= nil then
-                apply_code_action(opts.bufnr, code_action_info.client_id, params, code_action_info.lsp_action)
-            end
-        end)
-    else
-        local results, err =
-            vim.lsp.buf_request_sync(opts.bufnr, ms.textDocument_codeAction, params, opts.lsp_timeout_ms)
+    local results, err = vim.lsp.buf_request_sync(opts.bufnr, ms.textDocument_codeAction, params, opts.lsp_timeout_ms)
 
-        if err == 'timeout' then
-            error('Request timeout while fetching available code actions from LSP server', 1)
-        elseif err ~= nil then
-            error('Error while fetching available code actions from LSP server: ' .. err, 1)
-        elseif results == nil then
-            error('Did not receive response from LSP server when fetching available code actions', 1)
-        end
+    if err == 'timeout' then
+        error('Request timeout while fetching available code actions from LSP server', 1)
+    elseif err ~= nil then
+        error('Error while fetching available code actions from LSP server: ' .. err, 1)
+    elseif results == nil then
+        error('Did not receive response from LSP server when fetching available code actions', 1)
+    end
 
-        local code_action_info = picker_api.find_code_action(action_identifier, results)
-        if code_action_info ~= nil then
-            apply_code_action_sync(
-                opts.bufnr,
-                code_action_info.client_id,
-                params,
-                code_action_info.lsp_action,
-                opts.lsp_timeout_ms
-            )
-        end
+    local code_action_info = picker_api.find_code_action(action_identifier, results)
+    if code_action_info ~= nil then
+        apply_code_action_sync(
+            opts.bufnr,
+            code_action_info.client_id,
+            params,
+            code_action_info.lsp_action,
+            opts.lsp_timeout_ms
+        )
     end
 end
 

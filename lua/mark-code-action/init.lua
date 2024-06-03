@@ -21,7 +21,6 @@ local config = require('mark-code-action.config')
 ---@field mark_name string name of mark
 ---@field bufnr integer? buffer number (default = 0)
 ---@field is_range_selection boolean? whether to use range params to select code action (default = false)
----@field is_async boolean? whether to run lsp commands asyncronously (default = false)
 ---@field lsp_timeout_ms? integer the timeout in milliseconds used when making syncronous lsp requests (default=2000)
 
 ---@class MarkCodeAction.MarkSelectionOptions
