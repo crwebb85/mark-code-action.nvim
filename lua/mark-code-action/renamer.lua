@@ -18,7 +18,7 @@ local ms = vim.lsp.protocol.Methods
 ---@field win? integer
 ---
 --- Lsp timeout
----@field timeout_ms? uinteger
+---@field lsp_timeout_ms? uinteger
 
 ---@class lsp.prepareRename.ResultWithPlaceHolder
 ---@field range lsp.Range
@@ -78,7 +78,7 @@ local function get_default_rename_prompt(opts)
             local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
 
             ---@type { err: lsp.ResponseError|nil, result: lsp.prepareRename.Result|nil  }|nil, string|nil
-            local response, err = client.request_sync(ms.textDocument_prepareRename, params, opts.timeout_ms, bufnr)
+            local response, err = client.request_sync(ms.textDocument_prepareRename, params, opts.lsp_timeout_ms, bufnr)
 
             --Not getting a good response from one of the LSP servers is not show stopping
             --since we will just check the next LSP but I think it is a good idea to at least warn the user
@@ -174,8 +174,7 @@ local function apply_rename(name, opts)
     for _, client in ipairs(clients) do
         local params = vim.lsp.util.make_position_params(win, client.offset_encoding)
         params.newName = name
-        local response, err = client.request_sync(ms.textDocument_rename, params, opts.timeout_ms, bufnr)
-        vim.print(client.name, response, err)
+        local response, err = client.request_sync(ms.textDocument_rename, params, opts.lsp_timeout_ms, bufnr)
         if err == 'timeout' then
             vim.notify('Request timeout during textDocument/rename request to LSP server', vim.log.levels.WARN)
         elseif err ~= nil then
@@ -207,14 +206,31 @@ end
 ---                name using a prompt buffer.
 ---@param opts? MarkCodeAction.rename.Opts Additional options
 function M.rename(new_name, opts)
-    opts = opts or {}
-    local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
-    local win = vim.api.nvim_get_current_win()
+    local default_opts = {
+        bufnr = vim.api.nvim_get_current_buf(),
+        win = vim.api.nvim_get_current_win(),
+        lsp_timeout_ms = 2000,
+    }
+
+    opts = vim.tbl_deep_extend('force', default_opts, opts or {})
 
     if new_name then
-        apply_rename(new_name, opts)
+        apply_rename(new_name, {
+            bufnr = opts.bufnr,
+            win = opts.win,
+            client_name = opts.client_name,
+            filter = opts.filter,
+            lsp_timeout_ms = opts.lsp_timeout_ms,
+        })
+        return
     end
-    local prompt, err = get_default_rename_prompt(opts)
+    local prompt, err = get_default_rename_prompt({
+        bufnr = opts.bufnr,
+        win = opts.win,
+        client_name = opts.client_name,
+        filter = opts.filter,
+        lsp_timeout_ms = opts.lsp_timeout_ms,
+    })
 
     if err == 'timeout' then
         error('Lsp client timout')
@@ -231,7 +247,7 @@ function M.rename(new_name, opts)
 
     local rename_prompt_win = vim.api.nvim_open_win(rename_prompt_bufnr, true, {
         split = 'below',
-        win = win,
+        win = opts.win,
         height = 1,
     })
     vim.wo[rename_prompt_win].winfixbuf = true
@@ -241,17 +257,25 @@ function M.rename(new_name, opts)
             vim.notify('Rename operation canceled', vim.log.levels.WARN)
         end
 
-        if vim.api.nvim_win_is_valid(win) then
-            vim.api.nvim_set_current_win(win)
-            if vim.api.nvim_buf_is_valid(bufnr) then
-                vim.api.nvim_set_current_buf(bufnr)
+        if vim.api.nvim_win_is_valid(opts.win) then
+            vim.api.nvim_set_current_win(opts.win)
+            if vim.api.nvim_buf_is_valid(opts.bufnr) then
+                vim.api.nvim_set_current_buf(opts.bufnr)
             end
         end
         vim.api.nvim_win_close(rename_prompt_win, true)
         vim.api.nvim_buf_delete(rename_prompt_bufnr, { force = true })
 
-        opts.client_name = prompt.client_name
-        apply_rename(name, opts)
+        local _, apply_rename_err = apply_rename(name, {
+            bufnr = opts.bufnr,
+            win = opts.win,
+            client_name = prompt.client_name,
+            filter = opts.filter,
+            lsp_timeout_ms = opts.lsp_timeout_ms,
+        })
+        if apply_rename_err ~= nil then
+            error(apply_rename_err, vim.log.levels.ERROR)
+        end
     end)
 
     vim.cmd([[:startinsert]])

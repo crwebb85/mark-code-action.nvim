@@ -15,7 +15,9 @@
 -   [x] refactor: add a namespace to types to prevent conflicts with user defined types
 -   [x] docs: add readme
 -   [x] add syncronous lsp renaming
--   [ ] refactor!: remove async version of running code actions
+-   [x] refactor!: remove async version of running code actions
+-   [ ] fix: configuration for lsp_timeout_ms
+-   [ ] fix: cursor after rename operation
 -   [ ] feat: add user defined pickers to configuration
 -   [ ] refactor: break up code to expose a public API and add it to the readme
 -   [ ] chore: commit to a vocabulary (like whether the mark is the word used to select

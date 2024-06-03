@@ -84,13 +84,15 @@ end, {
 })
 
 vim.api.nvim_create_user_command('MarkCodeActionRename', function(opts)
-    local name = opts.args
-
-    renamer.rename(nil, {
+    local new_name = opts.args
+    if vim.trim(new_name) == '' then
+        new_name = nil
+    end
+    renamer.rename(new_name, {
         name = nil,
         bufnr = nil,
         filter = nil,
-        timeout_ms = 2000,
+        lsp_timeout_ms = config.get_config().lsp_timeout_ms,
     })
 end, {
     desc = 'Renames',
