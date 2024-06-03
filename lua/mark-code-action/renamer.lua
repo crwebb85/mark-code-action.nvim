@@ -246,6 +246,7 @@ function M.rename(new_name, opts)
 
     vim.bo[rename_prompt_bufnr].filetype = 'MarkCodeActionRenamePrompt'
     vim.bo[rename_prompt_bufnr].buftype = 'prompt'
+    vim.bo[rename_prompt_bufnr].bufhidden = 'delete'
     vim.fn.prompt_setprompt(rename_prompt_bufnr, '')
     vim.api.nvim_buf_set_lines(rename_prompt_bufnr, 0, -1, true, { prompt.prompt })
 
