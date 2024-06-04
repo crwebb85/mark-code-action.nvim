@@ -263,10 +263,6 @@ function M.rename(new_name, opts)
         local lines = vim.api.nvim_buf_get_lines(rename_prompt_bufnr, 0, -1, true)
         local name = vim.trim(lines[1])
 
-        if name == '' then
-            vim.notify('Rename operation canceled', vim.log.levels.INFO)
-        end
-
         if vim.api.nvim_win_is_valid(opts.win) then
             vim.api.nvim_set_current_win(opts.win)
             if vim.api.nvim_buf_is_valid(opts.bufnr) then
@@ -275,6 +271,11 @@ function M.rename(new_name, opts)
         end
         vim.api.nvim_win_close(rename_prompt_win, true)
         vim.api.nvim_buf_delete(rename_prompt_bufnr, { force = true })
+
+        if name == '' then
+            vim.notify('Rename operation canceled', vim.log.levels.INFO)
+            return
+        end
 
         local _, apply_rename_err = apply_rename(name, {
             bufnr = opts.bufnr,
