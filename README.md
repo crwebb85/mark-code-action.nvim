@@ -106,7 +106,31 @@ require('mark-code-action')({
 
 ## Recipes
 
-TODO
+The following keymaps for LSP Client functionality will dynamically switch to the blocking block version of the feature when recording or running a macro.
+
+```lua
+    vim.keymap.set('n', 'K', function()
+        if vim.fn.reg_executing() ~= '' or vim.fn.reg_recording() ~= '' then
+            require('mark-code-action.hover').hover()
+        else
+            vim.lsp.buf.hover()
+        end
+    end, {
+        buffer = bufnr,
+        desc = [[LSP: Displays hover information about the symbol under the cursor in a floating window. Calling the function twice will jump into the floating window.]],
+    })
+
+    vim.keymap.set('n', '<F2>', function()
+        if vim.fn.reg_executing() ~= '' or vim.fn.reg_recording() ~= '' then
+            require('mark-code-action.renamer').rename()
+        else
+            vim.lsp.buf.rename()
+        end
+    end, {
+        buffer = bufnr,
+        desc = 'LSP: Renames all references to the symbol under the cursor.',
+    })
+```
 
 ## Advanced topics
 
