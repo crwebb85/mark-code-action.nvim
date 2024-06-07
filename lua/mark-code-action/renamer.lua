@@ -50,7 +50,7 @@ local function get_default_rename_prompt(opts)
         bufnr = bufnr,
         name = opts.client_name,
         -- Clients must at least support rename, prepareRename is optional
-        method = 'textDocument/rename',
+        method = ms.textDocument_rename,
     })
     if opts.filter then
         clients = vim.tbl_filter(opts.filter, clients)
