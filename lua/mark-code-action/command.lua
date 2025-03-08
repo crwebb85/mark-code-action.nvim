@@ -1,5 +1,6 @@
 local action = require('mark-code-action.action')
 local renamer = require('mark-code-action.renamer')
+local locations = require('mark-code-action.locations')
 local config = require('mark-code-action.config')
 ---Type definitions for the params that neovim passes to a user commands callback
 ---@class MarkCodeAction.UserCommandOptions
@@ -84,8 +85,9 @@ end, {
 })
 
 vim.api.nvim_create_user_command('MarkCodeActionRename', function(opts)
+    ---@type string?
     local new_name = opts.args
-    if vim.trim(new_name) == '' then
+    if vim.trim(opts.args) == '' then
         new_name = nil
     end
     renamer.rename(new_name, {
@@ -98,4 +100,61 @@ end, {
     desc = 'Renames',
     nargs = '?',
     complete = function() end,
+})
+
+-------------------------------------------------------------------------------
+
+vim.api.nvim_create_user_command('MarkCodeActionGotoDeclaration', function(_)
+    locations.goto_declaration()
+end, {
+    desc = 'Go to declaration',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionGotoDefinition', function(_)
+    locations.goto_definition()
+end, {
+    desc = 'Go to definition',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionGotoTypeDefinition', function(_)
+    locations.goto_type_definition()
+end, {
+    desc = 'Go to type definition',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionGotoImplementation', function(_)
+    locations.goto_implementation()
+end, {
+    desc = 'Go to type implementatation',
+})
+
+-------------------------------------------------------------------------------
+vim.api.nvim_create_user_command('MarkCodeActionListDeclarations', function(_)
+    locations.list_declarations()
+end, {
+    desc = 'List declarations',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionListDefinitions', function(_)
+    locations.list_definitions()
+end, {
+    desc = 'List definitions',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionListTypeDefinitions', function(_)
+    locations.list_type_definitions()
+end, {
+    desc = 'List type definitions',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionListImplementations', function(_)
+    locations.list_implementations()
+end, {
+    desc = 'List implementatation',
+})
+
+vim.api.nvim_create_user_command('MarkCodeActionListReferences', function(_)
+    locations.list_references()
+end, {
+    desc = 'List references',
 })

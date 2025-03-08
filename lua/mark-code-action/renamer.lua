@@ -19,7 +19,7 @@ local ms = vim.lsp.protocol.Methods
 ---(default: current window)
 ---@field win? integer
 ---
---- Lsp timeout
+--- Lsp request timeout (overrides default in config)
 ---@field lsp_timeout_ms? uinteger
 
 ---@class lsp.prepareRename.ResultWithPlaceHolder
