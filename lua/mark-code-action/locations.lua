@@ -9,6 +9,9 @@ local ms = vim.lsp.protocol.Methods
 ---Predicate used to filter clients. Receives a client as argument and
 ---must return a boolean. Clients matching the predicate are included.
 ---@field filter? fun(client: vim.lsp.Client): boolean?
+---A callback to map the LSP result to a list of quickfix entries
+---TODO figure out a better way to abstract this so that map_result is not public
+---@field map_result? fun(result: any, ctx: MarkCodeAction.lsp.MakeParametersContext): vim.quickfix.entry[]
 
 ---@class MarkCodeAction.lsp.LocationGotoOpts: MarkCodeAction.lsp.LocationOpts
 ---Jump to existing window if buffer is already open in a window (default: false)
@@ -56,6 +59,36 @@ local function make_position_parameters(ctx)
     return params
 end
 
+---Makes the positional parameters for the clients offset_encoding.
+---Has a callback that allows modifying the params for the specific LSP client.
+---@param ctx MarkCodeAction.lsp.MakeParametersContext
+---@return lsp.TextDocumentPositionParams positional_params
+---@diagnostic disable-next-line: unused-local
+local function make_text_document_params(ctx)
+    local params = { textDocument = vim.lsp.util.make_text_document_params() }
+    return params
+end
+
+---Maps a single LSP location or multiple LSP locations to quickfix entries
+---@param result lsp.Location | lsp.Location[]
+---@param ctx MarkCodeAction.lsp.MakeParametersContext
+---@return vim.quickfix.entry[]
+local function locations_to_items(result, ctx)
+    local locations = vim.islist(result) and result or { result }
+    local items = vim.lsp.util.locations_to_items(locations, ctx.client.offset_encoding)
+    return items
+end
+
+---Maps document symbols to quickfix entries
+---@param result lsp.DocumentSymbol[]|lsp.SymbolInformation[]
+---@param ctx MarkCodeAction.lsp.MakeParametersContext
+---@return vim.quickfix.entry[]
+local function symbols_to_items(result, ctx)
+    local locations = vim.islist(result) and result or { result }
+    local items = vim.lsp.util.symbols_to_items(locations, ctx.cursor_info.bufnr, ctx.client.offset_encoding)
+    return items
+end
+
 ---Gets the location items from the lsp for the given method
 ---@param method string
 ---@param cursor_info MarkCodeAction.lsp.CursorInfo
@@ -65,7 +98,7 @@ end
 ---@return string|nil
 local function get_locations(method, cursor_info, make_params_callback, opts)
     ---@type vim.quickfix.entry[]
-    local location_items = {}
+    local all_entries = {}
     ---@type string[]
     local error_messages = {}
 
@@ -81,7 +114,7 @@ local function get_locations(method, cursor_info, make_params_callback, opts)
 
     if not next(clients) then
         local error_message = 'Error: no client for buffer support ' .. method
-        return location_items, error_message
+        return all_entries, error_message
     end
 
     for _, client in ipairs(clients) do
@@ -132,9 +165,8 @@ local function get_locations(method, cursor_info, make_params_callback, opts)
                 .. ' However it did not specify what that error was.\n'
             table.insert(error_messages, error_message)
         elseif response.result ~= nil then
-            local locations = vim.islist(response.result) and response.result or { response.result }
-            local items = vim.lsp.util.locations_to_items(locations, client.offset_encoding)
-            vim.list_extend(location_items, items)
+            local entries = opts.map_result(response.result, ctx)
+            vim.list_extend(all_entries, entries)
         end
     end
 
@@ -146,7 +178,7 @@ local function get_locations(method, cursor_info, make_params_callback, opts)
         end
     end
 
-    return location_items, full_error_message
+    return all_entries, full_error_message
 end
 
 ---Get the information about the cursor
@@ -279,6 +311,8 @@ end
 --- Use list_declarations(opts) if you want a list instead.
 --- @param opts? MarkCodeAction.lsp.LocationGotoOpts
 function M.goto_declaration(opts)
+    opts = opts or {}
+    opts.map_result = locations_to_items
     goto_location(ms.textDocument_declaration, make_position_parameters, opts)
 end
 
@@ -288,6 +322,8 @@ end
 --- Use list_definitions(opts) if you want a list instead.
 --- @param opts? MarkCodeAction.lsp.LocationGotoOpts
 function M.goto_definition(opts)
+    opts = opts or {}
+    opts.map_result = locations_to_items
     goto_location(ms.textDocument_definition, make_position_parameters, opts)
 end
 
@@ -297,6 +333,8 @@ end
 --- Use list_type_definitions(opts) if you want a list instead.
 --- @param opts? MarkCodeAction.lsp.LocationGotoOpts
 function M.goto_type_definition(opts)
+    opts = opts or {}
+    opts.map_result = locations_to_items
     goto_location(ms.textDocument_typeDefinition, make_position_parameters, opts)
 end
 
@@ -306,6 +344,8 @@ end
 --- Use list_implementations(opts) if you want a list instead.
 --- @param opts? MarkCodeAction.lsp.LocationGotoOpts
 function M.goto_implementation(opts)
+    opts = opts or {}
+    opts.map_result = locations_to_items
     goto_location(ms.textDocument_implementation, make_position_parameters, opts)
 end
 
@@ -317,6 +357,7 @@ end
 function M.list_declarations(opts)
     opts = opts or {}
     opts.title = opts.title or 'LSP Declarations'
+    opts.map_result = locations_to_items
     list_locations(ms.textDocument_declaration, make_position_parameters, opts)
 end
 
@@ -328,6 +369,7 @@ end
 function M.list_definitions(opts)
     opts = opts or {}
     opts.title = opts.title or 'LSP Definitions'
+    opts.map_result = locations_to_items
     list_locations(ms.textDocument_definition, make_position_parameters, opts)
 end
 
@@ -339,6 +381,7 @@ end
 function M.list_type_definitions(opts)
     opts = opts or {}
     opts.title = opts.title or 'LSP Type Definitions'
+    opts.map_result = locations_to_items
     list_locations(ms.textDocument_typeDefinition, make_position_parameters, opts)
 end
 
@@ -350,6 +393,7 @@ end
 function M.list_implementations(opts)
     opts = opts or {}
     opts.title = opts.title or 'LSP Implementations'
+    opts.map_result = locations_to_items
     list_locations(ms.textDocument_implementation, make_position_parameters, opts)
 end
 
@@ -360,7 +404,19 @@ end
 function M.list_references(opts)
     opts = opts or {}
     opts.title = opts.title or 'LSP References'
+    opts.map_result = locations_to_items
     list_locations(ms.textDocument_references, make_position_parameters, opts)
+end
+
+--- Lists the document symbols in the buffer.
+--- This is a synchronous replacement for vim.lsp.buf.document_symbol().
+--- Will error if LSPs don't return at least one document symbol.
+--- @param opts? MarkCodeAction.lsp.LocationListOpts
+function M.list_document_symbols(opts)
+    opts = opts or {}
+    opts.title = opts.title or 'LSP Document Symbols'
+    opts.map_result = symbols_to_items
+    list_locations(ms.textDocument_documentSymbol, make_text_document_params, opts)
 end
 
 return M

@@ -158,3 +158,9 @@ vim.api.nvim_create_user_command('MarkCodeActionListReferences', function(_)
 end, {
     desc = 'List references',
 })
+
+vim.api.nvim_create_user_command('MarkCodeActionListDocumentSymbols', function(_)
+    locations.list_document_symbols()
+end, {
+    desc = 'List document symbols',
+})
